@@ -37,3 +37,23 @@
 *.exe filter=lfs diff=lfs merge=lfs -text
 *.lib filter=lfs diff=lfs merge=lfs -text
 *.pdb filter=lfs diff=lfs merge=lfs -text
+
+# UE 핵심 바이너리만 LFS
+*.uasset filter=lfs diff=lfs merge=lfs -text
+*.umap   filter=lfs diff=lfs merge=lfs -text
+*.ubulk  filter=lfs diff=lfs merge=lfs -text
+*.locres filter=lfs diff=lfs merge=lfs -text
+
+# 아트/오디오(필요한 것만)
+*.fbx    filter=lfs diff=lfs merge=lfs -text
+*.png    filter=lfs diff=lfs merge=lfs -text
+*.tga    filter=lfs diff=lfs merge=lfs -text
+*.wav    filter=lfs diff=lfs merge=lfs -text
+
+# 텍스트/스크립트는 LFS 금지
+*.uproject text
+*.uplugin  text
+*.ini      text
+*.cpp      text
+*.h        text
+*.json     text
