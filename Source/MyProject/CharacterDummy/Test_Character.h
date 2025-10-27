@@ -48,11 +48,20 @@ class ATest_Character : public ACharacter
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* CrouchAction;
-	
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* SprintAction;
 
 public:
 	ATest_Character();
+
+	virtual void BeginPlay() override;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float SprintSpeed = 600.f;
 	
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float WalkSpeed = 300.f;
 
 protected:
 
@@ -65,6 +74,11 @@ protected:
 	void OnInteract(const FInputActionValue& Value);
 
 	void ToggleCrouch(const FInputActionValue& Value);
+	
+	void StartSprint(const FInputActionValue& Value);
+
+	void StopSprint(const FInputActionValue& Value);
+
 
 protected:
 
@@ -80,13 +94,39 @@ public:
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 
+	UPROPERTY(EditDefaultsOnly, Category = "Interact")
+	TObjectPtr<UAnimMontage> InteractMontage;
+
+	UPROPERTY(Replicated)
+	bool bIsInteracting = false; // 몽타주 재생 여부
+
+	UFUNCTION()
+	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted); // 몽타주 종료 콜백
+
+	// 입력 잠금 관리
+	void SetInputLocked(bool bLocked);
+	
+private:
+	
+	FTimerHandle SpeedInterpTimerHandle;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float SpeedInterpSpeed = 5.f;
+	// Sprint -> Walk 보간
+	void InterpSpeed();
+
 
 #pragma region Replicated
 
 public:
 	// ReplicatedUsing을 추가하여 클라이언트에서 변경 감지
-	UPROPERTY(ReplicatedUsing = OnRep_WantsToCrouch, VisibleDefaultsOnly, BlueprintReadOnly, Category = Crouch)
-	uint8 bWantsToCrouch : 1;  
+	UPROPERTY(ReplicatedUsing = OnRep_WantsToCrouch, VisibleDefaultsOnly, BlueprintReadOnly, Category = "Crouch")
+	uint8 bWantsToCrouch : 1;	// 앉기 플래그
+
+	UPROPERTY(ReplicatedUsing = OnRep_IsSprinting ,VisibleDefaultsOnly ,BlueprintReadOnly ,Category = "Sprint")
+	uint8 bIsSprinting : 1;		// 달리기 플래그
+
+
 	
 protected:
 	
@@ -94,14 +134,22 @@ protected:
 	void Multicast_PlayMontage(UAnimMontage* Montage, float PlayRate = 1.f);
 
 	UFUNCTION(Server, Reliable)
-	void Server_ToggleCrouch();
+	void ServerRPC_ToggleCrouch();
+
+	UFUNCTION(Server, Reliable)
+	void ServerRPC_SetSprinting(bool bNewSprinting);
 
 	// 복제 콜백 함수 추가
 	UFUNCTION()
 	void OnRep_WantsToCrouch();
 
+	UFUNCTION()
+	void OnRep_IsSprinting();
+
 	// 실제 크라우치 로직을 처리하는 헬퍼 함수
 	void HandleCrouchToggle();
 
+	void UpdateMovementSpeed();	// 속도 변경
+	
 #pragma endregion
 };
