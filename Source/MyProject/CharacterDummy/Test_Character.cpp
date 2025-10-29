@@ -47,17 +47,20 @@ ATest_Character::ATest_Character()
 	//GetCharacterMovement()->CrouchedHalfHeight = 48.0f;  // 앉았을 때 캡슐 높이 (기본 96의 절반)
 	//GetCharacterMovement()->MaxWalkSpeedCrouched = 250.f;  // 앉았을 때 이동 속도
 
-	// Create a camera boom
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 400.0f;
-	CameraBoom->bUsePawnControlRotation = true;
+	// 리슨 서버 및 일반 클라이언트 환경에서만 카메라를 생성
+	if (!IsRunningDedicatedServer())
+	{
+		// Create a camera boom
+		CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+		CameraBoom->SetupAttachment(RootComponent);
+		CameraBoom->TargetArmLength = 400.0f;
+		CameraBoom->bUsePawnControlRotation = true;
 
-	// Create a follow camera
-	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
-	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
-	FollowCamera->bUsePawnControlRotation = false;
-
+		// Create a follow camera
+		FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+		FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+		FollowCamera->bUsePawnControlRotation = false;
+	}
 	// bWantsToCrouch 헤더에서 비트필드로 false로 설정되어있으므로 생성자에서 초기값 설정
 	bWantsToCrouch = false;
 	bIsSprinting = false;
@@ -80,40 +83,47 @@ void ATest_Character::NotifyControllerChanged()
 	// Add Input Mapping Context
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+		if (PlayerController->IsLocalController()) // 로컬 컨트롤러인지 확인
 		{
-			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+			if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
+			{
+				Subsystem->AddMappingContext(DefaultMappingContext, 0);
+			}
 		}
 	}
 }
 
 void ATest_Character::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	// 로컬 플레이어의 입력을 설정할 때만 실행되도록 Controller 검사 추가
+	if (Controller && Controller->IsLocalController())
 	{
-		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+		if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+		{
+			// Jumping
+			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
-		// Moving
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ATest_Character::Move);
+			// Moving
+			EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ATest_Character::Move);
 
-		// Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ATest_Character::Look);
+			// Looking
+			EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ATest_Character::Look);
 
-		// Crouching - Started 이벤트로 토글
-		EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Started, this, &ThisClass::ToggleCrouch);
+			// Crouching - Started 이벤트로 토글
+			EnhancedInputComponent->BindAction(CrouchAction, ETriggerEvent::Started, this, &ThisClass::ToggleCrouch);
 
-		//	Sprint	Start 
-		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Triggered, this, &ThisClass::StartSprint);
-		//	Sprint	Stop
-		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &ThisClass::StopSprint);
+			//	Sprint	Start 
+			EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Triggered, this, &ThisClass::StartSprint);
+			//	Sprint	Stop
+			EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &ThisClass::StopSprint);
 
-		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &ThisClass::OnInteract);
-	}
-	else
-	{
-		UE_LOG(LogTemplateTestCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component!"), *GetNameSafe(this));
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Completed, this, &ThisClass::OnInteract);
+		}
+		else
+		{
+			UE_LOG(LogTemplateTestCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component!"), *GetNameSafe(this));
+		}
 	}
 }
 
