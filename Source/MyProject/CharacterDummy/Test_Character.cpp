@@ -138,8 +138,18 @@ void ATest_Character::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>
 
 void ATest_Character::OnMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
-	bIsInteracting = false;
-	SetInputLocked(false);
+	if (GetMesh() && GetMesh()->GetAnimInstance())
+	{
+		GetMesh()->GetAnimInstance()->OnMontageEnded.RemoveDynamic(this, &ATest_Character::OnMontageEnded);
+		UE_LOG(LogTemplateTestCharacter, Log, TEXT("[%s][Multicast] 몽타주 종료 콜백 제거 완료"), *GetNameSafe(this));
+	}
+    
+	// 이 액터가 로컬에서 제어되는 경우에만 입력 잠금 해제
+	if (IsLocallyControlled())
+	{
+		SetInputLocked(false);
+		UE_LOG(LogTemplateTestCharacter, Log, TEXT("[%s][Local] 몽타주 종료 콜백: 로컬 입력 잠금 해제"), *GetNameSafe(this));
+	}
 }
 
 void ATest_Character::SetInputLocked(bool bLocked)
@@ -221,21 +231,40 @@ void ATest_Character::Look(const FInputActionValue& Value)
 
 void ATest_Character::OnInteract(const FInputActionValue& Value)
 {
-	if (bIsInteracting) return; // 이미 상호작용 중이면 무시
-	if (!GetCharacterMovement() ||
-		GetCharacterMovement()->IsFalling() ||
-		GetCharacterMovement()->IsCrouching()) return;
-
-	if (InteractMontage)
+	if (IsLocallyControlled())
 	{
-		bIsInteracting = true;
-
-		// 로컬 입력 잠금
-		SetInputLocked(true);
-		
-		Multicast_PlayMontage(InteractMontage);
+		ServerRPC_OnInteract();
 	}
 }
+
+void ATest_Character::ServerRPC_OnInteract_Implementation()
+{
+	if (bIsInteracting) 
+	{
+		bIsInteracting = false;
+		Multicast_StopMontage(InteractMontage);
+       
+		UE_LOG(LogTemplateTestCharacter, Log, TEXT("[%s][Server] 상호작용 End"), *GetNameSafe(this));
+	}
+	
+	else if (InteractMontage)
+	{
+		// 상호작용 시작 전 유효성 검사
+		if (!GetCharacterMovement() ||
+			GetCharacterMovement()->IsFalling() ||
+			GetCharacterMovement()->IsCrouching())
+		{
+			UE_LOG(LogTemplateTestCharacter, Warning, TEXT("[%s][Server] 상호작용 Start 실패: 이동 상태가 유효하지 않음 (낙하 중 또는 앉기 중)"), *GetNameSafe(this));
+			return;
+		}
+       
+		bIsInteracting = true;
+		Multicast_PlayMontage(InteractMontage);
+       
+		UE_LOG(LogTemplateTestCharacter, Log, TEXT("[%s][Server] 상호작용 Start"), *GetNameSafe(this));
+	}
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Crouch Functions
 
@@ -401,7 +430,45 @@ void ATest_Character::Multicast_PlayMontage_Implementation(UAnimMontage* Montage
 	if (Montage && GetMesh() && GetMesh()->GetAnimInstance())
 	{
 		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-		AnimInstance->Montage_Play(Montage, PlayRate);
-		AnimInstance->OnMontageEnded.AddDynamic(this, &ATest_Character::OnMontageEnded);
+       
+		if (!AnimInstance->Montage_IsPlaying(Montage))
+		{
+			AnimInstance->OnMontageEnded.RemoveDynamic(this, &ATest_Character::OnMontageEnded);
+			AnimInstance->Montage_Play(Montage, PlayRate);
+			AnimInstance->OnMontageEnded.AddDynamic(this, &ATest_Character::OnMontageEnded);
+		}
+
+		// 로컬에서 제어되는 경우에만 입력 잠금
+		if (IsLocallyControlled())
+		{
+			SetInputLocked(true);
+			UE_LOG(LogTemplateTestCharacter, Log, TEXT("[%s][Local] 상호작용 몽타주 재생 시작, 입력 잠금"), *GetNameSafe(this));
+		}
+       
+	}
+	else
+	{
+		UE_LOG(LogTemplateTestCharacter, Warning, TEXT("[%s][Multicast] 몽타주 재생 실패"), 
+		   HasAuthority() ? TEXT("Server") : TEXT("Client"));
+	}
+}
+
+void ATest_Character::Multicast_StopMontage_Implementation(UAnimMontage* Montage, float BlendOutTime)
+{
+	if (Montage && GetMesh() && GetMesh()->GetAnimInstance())
+	{
+		UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+       
+		if (AnimInstance->Montage_IsPlaying(Montage))
+		{
+			AnimInstance->Montage_Stop(BlendOutTime, Montage);
+			
+			AnimInstance->OnMontageEnded.RemoveDynamic(this, &ATest_Character::OnMontageEnded);
+			
+			if (IsLocallyControlled())
+			{
+				SetInputLocked(false);
+			}
+		}
 	}
 }

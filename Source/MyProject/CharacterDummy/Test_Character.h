@@ -72,7 +72,7 @@ protected:
 	void Look(const FInputActionValue& Value);
 
 	void OnInteract(const FInputActionValue& Value);
-
+	
 	void ToggleCrouch(const FInputActionValue& Value);
 	
 	void StartSprint(const FInputActionValue& Value);
@@ -133,6 +133,12 @@ protected:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_PlayMontage(UAnimMontage* Montage, float PlayRate = 1.f);
 
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_StopMontage(UAnimMontage* Montage, float BlendOutTime = 0.2f);
+
+	UFUNCTION(Server, Reliable)
+	void ServerRPC_OnInteract();
+	
 	UFUNCTION(Server, Reliable)
 	void ServerRPC_ToggleCrouch();
 
