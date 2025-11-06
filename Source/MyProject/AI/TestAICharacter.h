@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/SphereComponent.h"
 #include "TestAICharacter.generated.h"
 
 UCLASS()
@@ -13,6 +14,9 @@ class MYPROJECT_API ATestAICharacter : public ACharacter
 public:
 	ATestAICharacter();
 
+	// 플레이어가 근처에 있어 상호작용 가능한 상태인지 저장
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction")
+	bool bIsPlayerNearby = false;
 protected:
 	virtual void BeginPlay() override;
 
@@ -20,8 +24,20 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
 private:
-    
+	// 상호작용 감지 영역 컴포넌트
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USphereComponent> InteractionRange;
+
+protected:
+	// 충돌 이벤트 처리를 위한 함수 선언
+	UFUNCTION()
+	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+	
 	// 상체(Upper, Suit) 모듈
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Modular", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> BodyModule;
@@ -65,4 +81,6 @@ private:
 	// 바지 모듈
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Modular", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> PantsModule;
+
+	
 };
