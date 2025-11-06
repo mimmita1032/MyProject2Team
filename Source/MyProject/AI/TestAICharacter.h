@@ -14,7 +14,7 @@ class MYPROJECT_API ATestAICharacter : public ACharacter
 public:
 	ATestAICharacter();
 
-	// 플레이어가 근처에 있어 상호작용 가능한 상태인지 저장
+	// 상효작용 가능한 상태인지 저장
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interaction")
 	bool bIsPlayerNearby = false;
 protected:
@@ -31,7 +31,7 @@ private:
 	TObjectPtr<USphereComponent> InteractionRange;
 
 protected:
-	// 충돌 이벤트 처리를 위한 함수 선언
+	// 충돌 이벤트
 	UFUNCTION()
 	void OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 
